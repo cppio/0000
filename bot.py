@@ -1,27 +1,37 @@
 from datetime import timezone
-from discord import Client
+from discord.ext.commands import Bot, command
+
+def get_prefix(bot, message):
+    prefixes = ["0000 ", "0000"]
+
+    if not message.guild:
+        prefixes.append("")
+
+    return prefixes
 
 
-class Bot(Client):
-    async def on_message(self, message):
-        if message.author.bot:
-            return
+bot = Bot(get_prefix)
 
-        if not message.guild:
-            delta = (message.created_at.timestamp() + 30) % 60 - 30
+@command(hidden=True, ignore_extra=False)
+async def delta(ctx):
+    created_at = ctx.message.created_at.replace(tzinfo=timezone.utc).astimezone()
+    timestamp = created_at.replace(tzinfo=timezone.utc).timestamp()
 
-            await message.channel.send(f"{delta * 1000:.0f} ms")
-        elif message.content == "0000":
-            created_at = message.created_at.replace(tzinfo=timezone.utc).astimezone()
-            timestamp = created_at.replace(tzinfo=timezone.utc).timestamp()
-            delta = (timestamp + 43200) % 86400 - 43200
-            delta_ms = round(delta * 1000)
+    nearest = 86400 if ctx.guild else 60
 
-            if -10000 < delta_ms < 60000:
-                await message.channel.send(f"{message.author.mention} {delta_ms} ms")
+    delta = (timestamp + nearest / 2) % nearest - nearest / 2
+    delta_ms = round(delta * 1000)
 
+    if not ctx.guild:
+        await ctx.send(f"{delta_ms} ms")
+    elif -10000 < delta_ms < 60000:
+        await ctx.send(f"{ctx.author.mention} {delta_ms} ms")
+
+delta.name = ""
+
+bot.add_command(delta)
 
 if __name__ == "__main__":
     import os
 
-    Bot().run(os.environ["TOKEN"])
+    bot.run(os.environ["TOKEN"])
