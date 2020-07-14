@@ -1,5 +1,7 @@
 from datetime import timezone
-from discord.ext.commands import Bot, command
+from discord.ext.commands import Bot, MinimalHelpCommand
+from discord.utils import escape_mentions
+
 
 def get_prefix(bot, message):
     prefixes = ["0000 ", "0000"]
@@ -10,9 +12,24 @@ def get_prefix(bot, message):
     return prefixes
 
 
-bot = Bot(get_prefix)
+class HelpCommand(MinimalHelpCommand):
+    def __init__(self, **options):
+        options.setdefault("no_category", "Commands")
+        super().__init__(**options)
 
-@command(hidden=True, ignore_extra=False)
+    def get_opening_note(self):
+        return f"Use `{self.clean_prefix}{self.invoked_with} [command]` for more info on a command."
+
+
+bot = Bot(get_prefix, HelpCommand())
+
+
+@bot.event
+async def on_command_error(ctx, error):
+    await ctx.send(escape_mentions(str(error)))
+
+
+@bot.command(aliases=[""], hidden=True, ignore_extra=False)
 async def delta(ctx):
     created_at = ctx.message.created_at.replace(tzinfo=timezone.utc).astimezone()
     timestamp = created_at.replace(tzinfo=timezone.utc).timestamp()
@@ -27,9 +44,6 @@ async def delta(ctx):
     elif -10000 < delta_ms < 60000:
         await ctx.send(f"{ctx.author.mention} {delta_ms} ms")
 
-delta.name = ""
-
-bot.add_command(delta)
 
 if __name__ == "__main__":
     import os
