@@ -22,6 +22,18 @@ class HelpCommand(MinimalHelpCommand):
 
 
 bot = Bot(get_prefix, HelpCommand())
+cur = None
+
+
+@bot.event
+async def on_connect():
+    global cur
+
+    if cur is None:
+        cur = conn.cursor()
+
+        cur.execute("create table if not exists messages (message, author, channel, guild, delta)")
+        conn.commit()
 
 
 @bot.event
@@ -44,8 +56,19 @@ async def delta(ctx):
     elif -10000 < delta_ms < 60000:
         await ctx.send(f"{ctx.author.mention} {delta_ms} ms")
 
+        cur.execute("insert into messages values (?, ?, ?, ?, ?)", (
+            ctx.message.id,
+            ctx.author.id,
+            ctx.channel.id,
+            ctx.guild.id,
+            delta_ms,
+        ))
+        conn.commit()
+
 
 if __name__ == "__main__":
-    import os
+    import os, sqlite3
+
+    conn = sqlite3.connect("bot.db")
 
     bot.run(os.environ["TOKEN"])
