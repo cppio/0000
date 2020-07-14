@@ -1,4 +1,5 @@
 from datetime import timezone
+from discord import Embed, Member
 from discord.ext.commands import Bot, MinimalHelpCommand
 from discord.utils import escape_mentions
 
@@ -64,6 +65,45 @@ async def delta(ctx):
             delta_ms,
         ))
         conn.commit()
+
+
+@bot.command()
+async def best(ctx, *, user: Member = None):
+    if not ctx.guild and not user:
+        user = ctx.author
+
+    query = ["select message, author, channel, guild, delta from messages where"]
+    parameters = []
+
+    if user:
+        title = f"{user.mention}'s best times"
+
+        query.append("author = ? and")
+        parameters.append(user.id)
+    else:
+        title = f"Best times"
+
+    if ctx.guild:
+        query.append("guild = ? and")
+        parameters.append(ctx.guild.id)
+
+    query.append("delta >= 0 order by delta limit 10")
+
+    cur.execute(" ".join(query), parameters)
+
+    lines = [f"**{title}**"]
+
+    for i, (message, author, channel, guild, delta) in enumerate(cur.fetchall(), 1):
+        url = f"https://discordapp.com/channels/{guild}/{channel}/{message}"
+
+        if user:
+            name = ""
+        else:
+            name = f"<@!{author}> "
+
+        lines.append(f"{i}. {name}[{delta} ms]({url})")
+
+    await ctx.send(embed=Embed(description="\n".join(lines)))
 
 
 if __name__ == "__main__":
