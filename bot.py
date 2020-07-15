@@ -1,6 +1,6 @@
 from datetime import timezone
 from discord import Embed, Member
-from discord.ext.commands import Bot, MinimalHelpCommand
+from discord.ext.commands import Bot, guild_only, MemberConverter, MinimalHelpCommand, TooManyArguments
 from discord.utils import escape_mentions
 
 
@@ -26,11 +26,18 @@ bot = Bot(get_prefix, HelpCommand())
 cur = None
 
 
+def calc_score(delta_ms):
+    delta = delta_ms / 1000
+    return round(200 - 5 / 3 * delta + 800 / 16 ** delta)
+
+
 @bot.event
 async def on_connect():
     global cur
 
     if cur is None:
+        conn.create_function("score", 1, calc_score, deterministic=True)
+
         cur = conn.cursor()
 
         cur.execute("create table if not exists messages (message, author, channel, guild, delta, target)")
@@ -55,7 +62,23 @@ async def delta(ctx):
     if not ctx.guild:
         await ctx.send(f"{delta_ms} ms")
     elif -10000 < delta_ms < 60000:
-        await ctx.send(f"{ctx.author.mention} {delta_ms} ms")
+        target = round(timestamp - delta)
+
+        cur.execute("select count(*) from messages where author = ? and guild = ? and target = ?", (
+            ctx.author.id,
+            ctx.guild.id,
+            target,
+        ))
+
+        previous, = cur.fetchone()
+
+        if previous or delta_ms < 0:
+            points = ""
+        else:
+            suffix = "!" * (5 - delta_ms // 200)
+            points = f"**(+{calc_score(delta_ms)} points{suffix})**"
+
+        await ctx.send(f"{ctx.author.mention} {delta_ms} ms{points}")
 
         cur.execute("insert into messages values (?, ?, ?, ?, ?, ?)", (
             ctx.message.id,
@@ -63,14 +86,18 @@ async def delta(ctx):
             ctx.channel.id,
             ctx.guild.id,
             delta_ms,
-            round(timestamp - delta),
+            target,
         ))
         conn.commit()
 
 
 @bot.command()
-async def best(ctx, *, user: Member = None):
-    if not ctx.guild and not user:
+async def best(ctx, *, user=None):
+    if ctx.guild:
+        user = user and await MemberConverter().convert(ctx, user)
+    elif user:
+        raise TooManyArguments(f"Too many arguments passed to best")
+    else:
         user = ctx.author
 
     query = ["select message, author, channel, guild, delta from messages where"]
@@ -97,14 +124,45 @@ async def best(ctx, *, user: Member = None):
     for i, (message, author, channel, guild, delta) in enumerate(cur.fetchall(), 1):
         url = f"https://discordapp.com/channels/{guild}/{channel}/{message}"
 
-        if user:
-            name = ""
-        else:
-            name = f"<@!{author}> "
+        name = "" if user else f"<@!{author}> "
 
         lines.append(f"{i}. {name}[{delta} ms]({url})")
 
     await ctx.send(embed=Embed(description="\n".join(lines)))
+
+
+@bot.command(ignore_extra=False)
+@guild_only()
+async def top(ctx):
+    inner = "select author, score(min(delta)) as scores from messages where guild = ? group by author, target having min(delta) >= 0"
+
+    cur.execute(f"select author, sum(scores) from ({inner}) group by author order by sum(scores) desc limit 10", (
+        ctx.guild.id,
+    ))
+
+    lines = ["**Top scores**"]
+
+    for i, (author, score) in enumerate(cur.fetchall(), 1):
+        lines.append(f"{i}. <@!{author}> {score}")
+
+    await ctx.send(embed=Embed(description="\n".join(lines)))
+
+
+@bot.command()
+@guild_only()
+async def score(ctx, *, user: Member = None):
+    user = user or ctx.author
+
+    inner = "select score(min(delta)) as scores from messages where author = ? and guild = ? group by target having min(delta) >= 0"
+
+    cur.execute(f"select sum(scores) from ({inner})", (
+        user.id,
+        ctx.guild.id,
+    ))
+
+    score, = cur.fetchone()
+
+    await ctx.send(embed=Embed(description=f"{user.mention} has a score of {score}"))
 
 
 if __name__ == "__main__":
