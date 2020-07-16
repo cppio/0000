@@ -76,7 +76,7 @@ async def delta(ctx):
             points = ""
         else:
             suffix = "!" * (5 - delta_ms // 200)
-            points = f"**(+{calc_score(delta_ms)} points{suffix})**"
+            points = f" **(+{calc_score(delta_ms)} points{suffix})**"
 
         await ctx.send(f"{ctx.author.mention} {delta_ms} ms{points}")
 
@@ -162,7 +162,7 @@ async def score(ctx, *, user: Member = None):
 
     score, = cur.fetchone()
 
-    await ctx.send(embed=Embed(description=f"{user.mention} has a score of {score}"))
+    await ctx.send(embed=Embed(description=f"{user.mention} has a score of {score or 0}"))
 
 
 if __name__ == "__main__":
