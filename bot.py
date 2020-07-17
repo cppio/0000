@@ -1,4 +1,4 @@
-from datetime import timezone, date
+from datetime import date, timezone
 from discord import Embed, Member
 from discord.ext.commands import Bot, guild_only, MemberConverter, MinimalHelpCommand, TooManyArguments
 from discord.utils import escape_mentions
@@ -78,8 +78,6 @@ async def delta(ctx):
             suffix = "!" * (5 - delta_ms // 200)
             points = f" **(+{calc_score(delta_ms)} points{suffix})**"
 
-        await ctx.send(f"{ctx.author.mention} {delta_ms} ms{points}")
-
         cur.execute("insert into messages values (?, ?, ?, ?, ?, ?)", (
             ctx.message.id,
             ctx.author.id,
@@ -89,6 +87,8 @@ async def delta(ctx):
             target,
         ))
         conn.commit()
+
+        await ctx.send(f"{ctx.author.mention} {delta_ms} ms{points}")
 
 
 @bot.command()
@@ -125,9 +125,8 @@ async def best(ctx, *, user=None):
         url = f"https://discordapp.com/channels/{guild}/{channel}/{message}"
 
         name = "" if user else f"<@!{author}> "
-        iso_date = date.fromtimestamp(target).isoformat()
 
-        lines.append(f"{i}. {name}[{delta} ms]({url}) ({iso_date})")
+        lines.append(f"{i}. {name}[{delta} ms]({url}) on {date.fromtimestamp(target)}")
 
     await ctx.send(embed=Embed(description="\n".join(lines)))
 
