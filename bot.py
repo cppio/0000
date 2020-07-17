@@ -1,4 +1,4 @@
-from datetime import timezone
+from datetime import timezone, date
 from discord import Embed, Member
 from discord.ext.commands import Bot, guild_only, MemberConverter, MinimalHelpCommand, TooManyArguments
 from discord.utils import escape_mentions
@@ -100,7 +100,7 @@ async def best(ctx, *, user=None):
     else:
         user = ctx.author
 
-    query = ["select message, author, channel, guild, delta from messages where"]
+    query = ["select message, author, channel, guild, delta, target from messages where"]
     parameters = []
 
     if user:
@@ -121,12 +121,13 @@ async def best(ctx, *, user=None):
 
     lines = [f"**{title}**"]
 
-    for i, (message, author, channel, guild, delta) in enumerate(cur.fetchall(), 1):
+    for i, (message, author, channel, guild, delta, target) in enumerate(cur.fetchall(), 1):
         url = f"https://discordapp.com/channels/{guild}/{channel}/{message}"
 
         name = "" if user else f"<@!{author}> "
+        iso_date = date.fromtimestamp(target).isoformat()
 
-        lines.append(f"{i}. {name}[{delta} ms]({url})")
+        lines.append(f"{i}. {name}[{delta} ms]({url}) ({iso_date})")
 
     await ctx.send(embed=Embed(description="\n".join(lines)))
 
