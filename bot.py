@@ -1,4 +1,4 @@
-from datetime import date, timezone
+from datetime import datetime, timezone
 from discord import Embed, Member
 from discord.ext.commands import Bot, guild_only, MemberConverter, MinimalHelpCommand, TooManyArguments
 from discord.utils import escape_mentions
@@ -126,7 +126,7 @@ async def best(ctx, *, user=None):
 
         name = "" if user else f"<@!{author}> "
 
-        lines.append(f"{i}. {name}[{delta} ms]({url}) on {date.fromtimestamp(target)}")
+        lines.append(f"{i}. {name}[{delta} ms]({url}) on {datetime.utcfromtimestamp(target).date()}")
 
     await ctx.send(embed=Embed(description="\n".join(lines)))
 
