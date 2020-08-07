@@ -40,7 +40,7 @@ async def on_connect():
 
         cur = conn.cursor()
 
-        cur.execute("create table if not exists messages (message, author, channel, guild, delta, target)")
+        cur.execute("create table if not exists messages (message int, author int, channel int, guild int, delta int, target int)")
         conn.commit()
 
 
